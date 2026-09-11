@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Games</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+    <style>
+      :root {
+        --bg: #f2f4f9;
+        --card-bg: #ffffff;
+        --ink: #171a2b;
+        --ink-dim: #7a8099;
+        --shadow: 0 10px 24px -12px rgba(23, 26, 43, 0.18), 0 2px 6px rgba(23, 26, 43, 0.06);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding-inline: 16px;
+        padding-block: 32px;
+      }
+      .wrap {
+        width: 100%;
+        max-width: 440px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      h1 {
+        font-family: 'Fredoka', ui-rounded, system-ui, sans-serif;
+        font-weight: 700;
+        font-size: 30px;
+        margin: 0;
+        text-align: center;
+      }
+      p.sub {
+        margin: -12px 0 0;
+        text-align: center;
+        color: var(--ink-dim);
+        font-size: 14px;
+      }
+      .game-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .game-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        text-decoration: none;
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: var(--shadow);
+        color: #fff;
+      }
+      .game-pitchpop {
+        background: linear-gradient(135deg, #4a7cf5, #7c3fc4);
+      }
+      .game-mathpop {
+        background: linear-gradient(135deg, #38c07f, #4a7cf5);
+      }
+      .game-icon {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.22);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+      }
+      .game-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .game-title {
+        font-family: 'Fredoka', ui-rounded, system-ui, sans-serif;
+        font-weight: 700;
+        font-size: 19px;
+      }
+      .game-sub {
+        font-size: 13px;
+        opacity: 0.85;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>🎮 Games</h1>
+      <p class="sub">Pick one to play</p>
+      <div class="game-list">
+        <a class="game-card game-pitchpop" href="./pitchpop/">
+          <span class="game-icon">🎵</span>
+          <span class="game-text">
+            <span class="game-title">PitchPop</span>
+            <span class="game-sub">Learn chords by their color</span>
+          </span>
+        </a>
+        <a class="game-card game-mathpop" href="./mathpop/">
+          <span class="game-icon">🔢</span>
+          <span class="game-text">
+            <span class="game-title">MathPop</span>
+            <span class="game-sub">Multiplication, addition, subtraction</span>
+          </span>
+        </a>
+      </div>
+    </div>
+  </body>
+</html>
