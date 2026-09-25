@@ -174,6 +174,35 @@
       .app-right p + p {
         margin-top: 1em;
       }
+      .stack {
+        margin-top: 1.2em;
+        padding-top: 1em;
+        border-top: 1px dashed #484848;
+      }
+      .stack-label {
+        display: block;
+        font-size: 0.85em;
+        color: var(--pink);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 0.6em;
+      }
+      .stack ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5em;
+      }
+      .stack li {
+        border: 1px solid var(--cyan);
+        color: var(--cyan);
+        padding: 0.2em 0.8em;
+        font-size: 0.9em;
+        letter-spacing: 1px;
+        border-radius: 3px;
+      }
       .app-links {
         margin-top: 1.2em;
         display: flex;
@@ -290,11 +319,25 @@
               <p>
                 PitchPop started as a game we play at home: I play a chord on the piano, and my kids grab the
                 matching color flag and shout it out. The app turns that into a quiz. Tap the rainbow to hear one of
-                nine chords, pick its color from four choices, and get confetti when you're right. There's also a
-                free-play mode for tapping any chord, plus a progress page for each child that tracks accuracy and
-                which colors have come up. The piano sound is synthesized in the browser, so the app ships no audio
-                files.
+                nine chords, pick its color from four choices, and get confetti and spoken feedback when you're
+                right. The piano sound is synthesized from harmonics with the Web Audio API, so the app ships no
+                audio samples. The voice is Piper, a neural text-to-speech model that runs in the browser through
+                ONNX Runtime. There's also a free-play mode, plus a progress page for each child that tracks
+                accuracy and which colors have come up. It installs to a phone's home screen as a PWA.
               </p>
+              <div class="stack">
+                <span class="stack-label">Tech stack</span>
+                <ul>
+                  <li>JavaScript</li>
+                  <li>React</li>
+                  <li>Vite</li>
+                  <li>Web Audio API</li>
+                  <li>Piper TTS</li>
+                  <li>ONNX Runtime Web</li>
+                  <li>PWA</li>
+                  <li>GitHub Pages</li>
+                </ul>
+              </div>
               <div class="app-links">
                 <a class="primary" href="./pitchpop/">Open app</a>
                 <a href="https://github.com/marikalam/pitchpop">Source on GitHub</a>
@@ -337,11 +380,25 @@
               <p>
                 MathPop is a sibling to PitchPop that uses arithmetic instead of chords. Kids pick multiplication,
                 addition, subtraction, or a random mix, then solve five-problem rounds with big colored cards,
-                chimes, and confetti. Each child gets a difficulty range that fits them. The wrong answers come from
-                common slip-ups, like being off by one factor or adding instead of multiplying, so getting it right
-                means knowing the answer rather than ruling out silly numbers. Progress is saved on the device and
-                broken down by operation.
+                chimes, and confetti. They can tap an answer or write it by hand: a small neural network I trained
+                on MNIST, with augmentation to handle messy kid handwriting, reads the digits right in the browser.
+                The wrong answer choices come from common slip-ups, like being off by one factor or adding instead
+                of multiplying, so getting it right means knowing the answer. Problems are read aloud with Piper
+                TTS, and progress is saved on the device and broken down by operation.
               </p>
+              <div class="stack">
+                <span class="stack-label">Tech stack</span>
+                <ul>
+                  <li>JavaScript</li>
+                  <li>React</li>
+                  <li>Vite</li>
+                  <li>Neural network (MNIST)</li>
+                  <li>Canvas API</li>
+                  <li>Piper TTS</li>
+                  <li>PWA</li>
+                  <li>GitHub Pages</li>
+                </ul>
+              </div>
               <div class="app-links">
                 <a class="primary" href="./mathpop/">Open app</a>
                 <a href="https://github.com/marikalam/mathpop">Source on GitHub</a>
@@ -380,11 +437,26 @@
               <h4><a href="./kachun-quizer/">Photo your notes, get quizzed on them</a></h4>
               <p>
                 Take a photo of your notes or paste them in, and Kachun Quizer turns them into an Anki-style
-                flashcard deck. Tesseract.js reads text from the photo, and a small NLP library picks the most
-                important word in each sentence to blank out. Each deck uses spaced repetition, so facts you miss
-                come back sooner and facts you know show up less often. There's no AI, account, or server: OCR
-                runs in the browser and your decks and history stay on your device.
+                flashcard deck. Tesseract.js reads the text out of the photo in the browser. Claude then writes
+                real comprehension questions from it, through a Cloudflare Worker that keeps the API key off the
+                client. If that request fails, the app falls back to an offline generator that uses NLP to blank out
+                the key word in each sentence, so a study session never hits a dead end. Each deck uses spaced
+                repetition: facts you miss come back sooner, and facts you know show up less often.
               </p>
+              <div class="stack">
+                <span class="stack-label">Tech stack</span>
+                <ul>
+                  <li>JavaScript</li>
+                  <li>React</li>
+                  <li>Vite</li>
+                  <li>Claude API</li>
+                  <li>Cloudflare Workers</li>
+                  <li>Tesseract.js (OCR)</li>
+                  <li>Compromise (NLP)</li>
+                  <li>Spaced repetition</li>
+                  <li>PWA</li>
+                </ul>
+              </div>
               <div class="app-links">
                 <a class="primary" href="./kachun-quizer/">Open app</a>
                 <a href="https://github.com/marikalam/kachun-quizer">Source on GitHub</a>
@@ -422,10 +494,27 @@
                 HomeDiary is a private diary for your home. Sign in, add your properties, and log a timeline of
                 everything that happens to them: purchase, damage, repairs, inspections, and more, each with photos
                 and documents attached. Paperwork like purchase documents, insurance policies, and warranties gets
-                its own place for each property. It's a full-stack app with a React and TypeScript front end, an
-                Express and Prisma API on Postgres, and file storage on Cloudflare R2. It runs as a single Docker
-                service on Render.
+                its own place for each property, and every account only ever sees its own homes. The app has a
+                typed REST API with JWT cookie auth and bcrypt password hashing, and uploads go straight to
+                S3-compatible object storage. It runs as a single Docker service on Render.
               </p>
+              <div class="stack">
+                <span class="stack-label">Tech stack</span>
+                <ul>
+                  <li>TypeScript</li>
+                  <li>React</li>
+                  <li>React Router</li>
+                  <li>Vite</li>
+                  <li>Node.js</li>
+                  <li>Express</li>
+                  <li>Prisma</li>
+                  <li>PostgreSQL (Neon)</li>
+                  <li>Cloudflare R2 (S3 API)</li>
+                  <li>JWT auth</li>
+                  <li>Docker</li>
+                  <li>Render</li>
+                </ul>
+              </div>
               <div class="app-links">
                 <a class="primary" href="https://homediary.onrender.com" target="_blank" rel="noopener noreferrer">Open app</a>
                 <a href="https://github.com/marikalam/HomeDiary">Source on GitHub</a>
