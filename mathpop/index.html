@@ -11,10 +11,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MathPop" />
-    <script type="module" crossorigin src="/apps/mathpop/assets/index-DSIe0kkr.js"></script>
-    <link rel="stylesheet" crossorigin href="/apps/mathpop/assets/index-3tHI4DNo.css">
+    <script type="module" crossorigin src="/apps/mathpop/assets/index-BfR4P3G7.js"></script>
+    <link rel="stylesheet" crossorigin href="/apps/mathpop/assets/index-HU91GQUL.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // An email link's sign-in details arrive after "#"; Supabase reads
+      // them and then clears them. Keep a copy first, so a link from an
+      // email sent by the iPhone app can hand them to the app (appLink.js).
+      window.__mathpopLaunchHash = location.hash;
+    </script>
   </body>
 </html>
