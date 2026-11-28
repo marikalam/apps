@@ -21,6 +21,47 @@ export function unlockAudio() {
   ensureAudio();
 }
 
+// After the app goes to the background (another app, or the screen
+// turned off), iOS can leave its audio silent even once it says it's
+// playing again, and only a tap may start it. So the first tap after
+// coming back makes a fresh AudioContext and plays a moment of silence
+// inside that tap, which wakes the sound up. (Same as MathPop.)
+let audioStale = false;
+function freshAudio() {
+  audioStale = false;
+  const old = audioCtx;
+  audioCtx = null;
+  if (old) {
+    if (currentSource) {
+      try {
+        currentSource.stop();
+      } catch {
+        /* already stopped */
+      }
+      currentSource = null;
+    }
+    old.close().catch(() => {});
+  }
+  const ctx = ensureAudio();
+  const silence = ctx.createBufferSource();
+  silence.buffer = ctx.createBuffer(1, 1, 22050);
+  silence.connect(ctx.destination);
+  silence.start(0);
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') audioStale = true;
+  });
+  window.addEventListener('pagehide', () => {
+    audioStale = true;
+  });
+  const onTap = () => {
+    if (audioCtx && (audioStale || audioCtx.state !== 'running')) freshAudio();
+  };
+  document.addEventListener('pointerdown', onTap, true);
+  document.addEventListener('touchend', onTap, true);
+}
+
 function tone(ctx, freq, start, dur, peak, type = 'sine') {
   const osc = ctx.createOscillator();
   osc.type = type;

@@ -1,0 +1,23 @@
+# Sends GeoPop to TestFlight: on every push to main that changes it, or by
+# hand from the Actions tab (Run workflow). The build itself is in
+# testflight-build.yml.
+name: TestFlight GeoPop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, claude/vocab-learning-app-kids-6m12b4]
+    paths:
+      - 'geopop/**'
+      - '!geopop/README.md'
+      - '.github/workflows/testflight-geopop.yml'
+      - '.github/workflows/testflight-build.yml'
+      - '.github/scripts/**'
+
+jobs:
+  testflight:
+    uses: ./.github/workflows/testflight-build.yml
+    with:
+      app: geopop
+      name: GeoPop
+    secrets: inherit

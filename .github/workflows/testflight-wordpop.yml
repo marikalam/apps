@@ -1,0 +1,23 @@
+# Sends WordPop to TestFlight: on every push to main that changes it, or by
+# hand from the Actions tab (Run workflow). The build itself is in
+# testflight-build.yml.
+name: TestFlight WordPop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, claude/vocab-learning-app-kids-6m12b4]
+    paths:
+      - 'wordpop/**'
+      - '!wordpop/README.md'
+      - '.github/workflows/testflight-wordpop.yml'
+      - '.github/workflows/testflight-build.yml'
+      - '.github/scripts/**'
+
+jobs:
+  testflight:
+    uses: ./.github/workflows/testflight-build.yml
+    with:
+      app: wordpop
+      name: WordPop
+    secrets: inherit

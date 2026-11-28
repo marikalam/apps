@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { createClient } from '@supabase/supabase-js';
 import { DEFAULT_GRADE } from './grades.js';
 
@@ -83,11 +84,15 @@ export async function getUser() {
   }
 }
 
-// Where links in sign-up and reset-password emails lead: back here. (The
-// Supabase project's Redirect URLs list needs
+// Where links in sign-up and reset-password emails lead: back here. In
+// the iPhone app the page's own address (capacitor://localhost) can't be
+// opened from an email, so the link goes to the website; once the email is
+// confirmed there, the family signs in in the app with their password.
+// (The Supabase project's Redirect URLs list needs
 // https://marikalam.github.io/apps/wordpop/** for this to work.)
+const WEB_APP_URL = 'https://marikalam.github.io/apps/wordpop/';
 function emailLinkUrl() {
-  return `${window.location.origin}${import.meta.env.BASE_URL}`;
+  return Capacitor.isNativePlatform() ? WEB_APP_URL : `${window.location.origin}${import.meta.env.BASE_URL}`;
 }
 
 function friendlyError(error) {
