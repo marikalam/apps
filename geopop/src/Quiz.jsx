@@ -58,7 +58,6 @@ function Prompt({ q, world, picked, onTapMap, homeId }) {
           height={330}
           colorOf={colorOf}
           dots={q.prompt.area}
-          homeId={homeId}
           onTap={(id) => !picked && onTapMap(id)}
         />
         <p className="prompt-map-hint">{picked ? (picked === q.answer ? 'Found it!' : `That’s ${BY_ID[picked]?.name}. ${BY_ID[q.answer].name} is the green one.`) : 'Tap the country on the map'}</p>
