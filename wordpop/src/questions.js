@@ -12,6 +12,7 @@ import {
 } from './content/phonics.js';
 import { PICTURE_VOCAB, VOCAB, tooClose } from './content/vocab.js';
 import { gradeInfo, gradeModes } from './grades.js';
+import { isDue, normalize } from './srs.js';
 
 export const ROUND_LENGTH = 10;
 
@@ -32,32 +33,33 @@ function cap(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// Picks `n` different items, favoring ones this player has missed or
-// hasn't seen much: an item missed twice is about three times as likely
-// to come up as one they always get right. `memory` is the player's
-// { [key]: { right, wrong } }.
-function pickFavoringMisses(items, keyOf, memory, n) {
-  const pool = items.map((item) => {
-    const m = memory?.[keyOf(item)] || { right: 0, wrong: 0 };
-    const seen = m.right + m.wrong;
-    const weight = Math.max(0.35, 1 + m.wrong * 1.2 - m.right * 0.3 + (seen === 0 ? 0.6 : 0));
-    return { item, weight };
-  });
-  const chosen = [];
-  while (chosen.length < n && pool.length) {
-    const total = pool.reduce((s, p) => s + p.weight, 0);
-    let r = Math.random() * total;
-    let idx = 0;
-    for (; idx < pool.length - 1; idx++) {
-      r -= pool[idx].weight;
-      if (r <= 0) break;
-    }
-    chosen.push(pool[idx].item);
-    pool.splice(idx, 1);
+// Picks `n` items the way Anki builds a study session:
+//   1. cards that are due (most overdue first) - reviews come first,
+//   2. then new cards, but only a few per round while there are reviews
+//      waiting (so new words don't crowd out ones being learned),
+//   3. then, if there still aren't enough, cards that aren't due yet,
+//      soonest first (practicing ahead).
+// With `dueOnly` (the Review game) it's only step 1.
+// `memory` is the player's cards: { [key]: card } (srs.js).
+const NEW_PER_ROUND = 4;
+
+function pick(items, keyOf, memory, n, { dueOnly = false, now = Date.now() } = {}) {
+  const withCard = items.map((item) => ({ item, card: memory?.[keyOf(item)] ? normalize(memory[keyOf(item)]) : null }));
+  const due = shuffle(withCard.filter((x) => x.card && isDue(x.card, now))).sort((a, b) => a.card.due - b.card.due);
+  if (dueOnly) return due.slice(0, n).map((x) => x.item);
+  const fresh = shuffle(withCard.filter((x) => !x.card || x.card.state === 'new'));
+  const ahead = withCard.filter((x) => x.card && x.card.state !== 'new' && !isDue(x.card, now)).sort((a, b) => a.card.due - b.card.due);
+  const chosen = due.slice(0, n);
+  const newCap = chosen.length ? Math.min(NEW_PER_ROUND, n - chosen.length) : n;
+  chosen.push(...fresh.slice(0, Math.max(0, newCap)));
+  for (const x of [...fresh.slice(Math.max(0, newCap)), ...ahead]) {
+    if (chosen.length >= n) break;
+    if (!chosen.includes(x)) chosen.push(x);
   }
   // Too few items for a whole round: go round again.
-  while (chosen.length < n && items.length) chosen.push(items[chosen.length % items.length]);
-  return chosen;
+  const out = shuffle(chosen.slice(0, n)).map((x) => x.item);
+  while (out.length < n && items.length) out.push(items[out.length % items.length]);
+  return out;
 }
 
 // Puts the right answer and the wrong ones in a random order.
@@ -87,11 +89,16 @@ function gradeSight(g) {
 
 // Vocabulary for a grade: its own list, plus a few words from the grade
 // before to keep them fresh.
-function gradeVocab(g) {
+// Vocabulary for a grade: its own list, every word from the grade before
+// that the player has already started learning (so their reviews keep
+// coming, as in Anki), and a few more from that list to keep it fresh.
+function gradeVocab(g, memory) {
   const level = { p: 1, k: 1, 1: 1, 2: 2, 3: 3, 4: 4 }[g];
   const own = VOCAB[level];
-  const review = VOCAB[level - 1] ? sample(VOCAB[level - 1], 6) : [];
-  return [...own, ...review];
+  const before = VOCAB[level - 1] || [];
+  const started = before.filter((v) => memory?.[`word:${v.w}`] || memory?.[`spell:${v.w}`]);
+  const extra = sample(before.filter((v) => !started.includes(v)), 4);
+  return [...own, ...started, ...extra];
 }
 
 // The words a question draws wrong answers from: same list as the word.
@@ -103,9 +110,9 @@ function vocabSiblings(t) {
 
 const MAKERS = {
   // Hear a sound, tap its letter.
-  sounds(g, memory, n) {
+  sounds(g, memory, n, opts) {
     const pool = gradeSounds(g);
-    return pickFavoringMisses(pool, (s) => `snd:${s.id}`, memory, n).map((s) => {
+    return pick(pool, (s) => `snd:${s.id}`, memory, n, opts).map((s) => {
       const wrong = sample(
         pool.filter((o) => o.id !== s.id && o.say !== s.say && !(['c', 'k'].includes(o.id) && ['c', 'k'].includes(s.id))),
         3,
@@ -129,9 +136,9 @@ const MAKERS = {
   },
 
   // A picture: which letter does its word start with?
-  first(g, memory, n) {
+  first(g, memory, n, opts) {
     const pool = gradePictureWords(g === 'p' ? 'k' : g);
-    return pickFavoringMisses(pool, (p) => `first:${p.w}`, memory, n).map((p) => {
+    return pick(pool, (p) => `first:${p.w}`, memory, n, opts).map((p) => {
       const right = firstSoundOf(p);
       const letters = [...new Set(SOUNDS.filter((s) => !s.show && s.id.length <= 2 && s.id !== 'ing').map((s) => s.id))];
       const clash = (l) => l === right || (['c', 'k'].includes(l) && ['c', 'k'].includes(right)) || (right.startsWith(l) || l.startsWith(right));
@@ -156,9 +163,9 @@ const MAKERS = {
 
   // "Say it slowly, then say it fast": the sounds are said one at a time,
   // and the child finds the word they make.
-  blend(g, memory, n) {
+  blend(g, memory, n, opts) {
     const pool = gradePictureWords(g === 'p' ? 'k' : g);
-    return pickFavoringMisses(pool, (p) => `blend:${p.w}`, memory, n).map((p) => {
+    return pick(pool, (p) => `blend:${p.w}`, memory, n, opts).map((p) => {
       const parts = wordParts(p).filter((x) => partSay(x));
       const slow = parts.map(partSay);
       const letters = parts.map((x) => x.text).join('–');
@@ -183,9 +190,9 @@ const MAKERS = {
 
   // A written word to read sound by sound (each sound can be tapped and
   // heard), then match to its picture.
-  soundout(g, memory, n) {
+  soundout(g, memory, n, opts) {
     const pool = gradePictureWords(g);
-    return pickFavoringMisses(pool, (p) => `read:${p.w}`, memory, n).map((p) => {
+    return pick(pool, (p) => `read:${p.w}`, memory, n, opts).map((p) => {
       const parts = wordParts(p);
       const wrong = sample(pool.filter((o) => o.w !== p.w), 3);
       const asChoice = (o) => ({ id: o.w, label: '', pic: o.pic, speak: '' });
@@ -207,10 +214,10 @@ const MAKERS = {
   },
 
   // Which word rhymes with this one?
-  rhyme(g, memory, n) {
+  rhyme(g, memory, n, opts) {
     const families = RHYMES;
     const words = families.flat().map(pictureWord);
-    return pickFavoringMisses(words, (p) => `rhyme:${p.w}`, memory, n).map((p) => {
+    return pick(words, (p) => `rhyme:${p.w}`, memory, n, opts).map((p) => {
       const family = families.find((f) => f.includes(p.w));
       const right = pictureWord(sample(family.filter((w) => w !== p.w), 1)[0]);
       const others = families.filter((f) => f !== family).flat().map(pictureWord);
@@ -239,9 +246,9 @@ const MAKERS = {
 
   // Hear a sight word, tap it. Wrong choices look alike (same first letter
   // or same length), so it takes really reading it.
-  sight(g, memory, n) {
+  sight(g, memory, n, opts) {
     const pool = gradeSight(g);
-    return pickFavoringMisses(pool, (w) => `sight:${w}`, memory, n).map((w) => {
+    return pick(pool, (w) => `sight:${w}`, memory, n, opts).map((w) => {
       const look = pool.filter((o) => o !== w && o.toLowerCase() !== w.toLowerCase());
       const alike = look.filter((o) => o[0].toLowerCase() === w[0].toLowerCase() || Math.abs(o.length - w.length) <= 1);
       const wrong = sample(alike.length >= 3 ? alike : look, 3);
@@ -263,9 +270,9 @@ const MAKERS = {
   },
 
   // "Which one is ENORMOUS?" with four pictures.
-  bigwords(g, memory, n) {
+  bigwords(g, memory, n, opts) {
     const pool = PICTURE_VOCAB;
-    return pickFavoringMisses(pool, (v) => `big:${v.w}`, memory, n).map((v) => {
+    return pick(pool, (v) => `big:${v.w}`, memory, n, opts).map((v) => {
       const wrong = sample(pool.filter((o) => o.group !== v.group), 3);
       const asChoice = (o) => ({ id: o.w, label: '', pic: o.pic, speak: '' });
       return withChoices(
@@ -286,8 +293,8 @@ const MAKERS = {
   },
 
   // What does this word mean?
-  meaning(g, memory, n) {
-    return pickFavoringMisses(gradeVocab(g), (v) => `word:${v.w}`, memory, n).map((v) => {
+  meaning(g, memory, n, opts) {
+    return pick(gradeVocab(g, memory), (v) => `word:${v.w}`, memory, n, opts).map((v) => {
       const wrong = sample(vocabSiblings(v).filter((o) => !tooClose(v, o)), 3);
       const asChoice = (o) => ({ id: o.w, label: o.def, speak: o.def });
       return withChoices(
@@ -308,8 +315,8 @@ const MAKERS = {
   },
 
   // A meaning: which word is it?
-  which(g, memory, n) {
-    return pickFavoringMisses(gradeVocab(g), (v) => `word:${v.w}`, memory, n).map((v) => {
+  which(g, memory, n, opts) {
+    return pick(gradeVocab(g, memory), (v) => `word:${v.w}`, memory, n, opts).map((v) => {
       const wrong = sample(vocabSiblings(v).filter((o) => !tooClose(v, o)), 3);
       const asChoice = (o) => ({ id: o.w, label: o.w, speak: o.w });
       return withChoices(
@@ -330,8 +337,8 @@ const MAKERS = {
   },
 
   // A sentence with a gap: which word fits?
-  blank(g, memory, n) {
-    return pickFavoringMisses(gradeVocab(g), (v) => `word:${v.w}`, memory, n).map((v) => {
+  blank(g, memory, n, opts) {
+    return pick(gradeVocab(g, memory), (v) => `word:${v.w}`, memory, n, opts).map((v) => {
       const wrong = sample(vocabSiblings(v).filter((o) => !tooClose(v, o)), 3);
       const asChoice = (o) => ({ id: o.w, label: o.w, speak: o.w });
       return withChoices(
@@ -352,9 +359,9 @@ const MAKERS = {
   },
 
   // Which word means about the same?
-  same(g, memory, n) {
-    const pool = gradeVocab(g).filter((v) => v.syn);
-    return pickFavoringMisses(pool, (v) => `word:${v.w}`, memory, n).map((v) => {
+  same(g, memory, n, opts) {
+    const pool = gradeVocab(g, memory).filter((v) => v.syn);
+    return pick(pool, (v) => `word:${v.w}`, memory, n, opts).map((v) => {
       const others = vocabSiblings(v).filter((o) => !tooClose(v, o));
       const wrong = sample([...new Set(others.map((o) => o.syn).filter((x) => x && x !== v.ant))], 3);
       return withChoices(
@@ -375,9 +382,9 @@ const MAKERS = {
   },
 
   // What's the opposite?
-  opposite(g, memory, n) {
-    const pool = gradeVocab(g).filter((v) => v.ant);
-    return pickFavoringMisses(pool, (v) => `word:${v.w}`, memory, n).map((v) => {
+  opposite(g, memory, n, opts) {
+    const pool = gradeVocab(g, memory).filter((v) => v.ant);
+    return pick(pool, (v) => `word:${v.w}`, memory, n, opts).map((v) => {
       const others = vocabSiblings(v).filter((o) => !tooClose(v, o));
       const candidates = [...new Set(others.map((o) => o.ant).filter((a) => a && a !== v.ant && a !== v.syn))];
       const wrong = sample(candidates, 3);
@@ -399,9 +406,9 @@ const MAKERS = {
   },
 
   // Hear a word, pick the right spelling out of four.
-  spell(g, memory, n) {
-    const pool = gradeVocab(g);
-    return pickFavoringMisses(pool, (v) => `spell:${v.w}`, memory, n).map((v) => {
+  spell(g, memory, n, opts) {
+    const pool = gradeVocab(g, memory);
+    return pick(pool, (v) => `spell:${v.w}`, memory, n, opts).map((v) => {
       const wrong = misspellings(v.w, 3);
       return withChoices(
         {
@@ -473,10 +480,60 @@ export function misspellings(word, n) {
   return [...out];
 }
 
-// One round: ten questions from one game, or for Random Mix, from all of
-// the grade's games.
+// Which cards each game asks about (the start of their keys).
+const KEY_PREFIX = {
+  sounds: 'snd',
+  first: 'first',
+  blend: 'blend',
+  soundout: 'read',
+  rhyme: 'rhyme',
+  sight: 'sight',
+  bigwords: 'big',
+  meaning: 'word',
+  which: 'word',
+  blank: 'word',
+  same: 'word',
+  opposite: 'word',
+  spell: 'spell',
+};
+
+function wordOf(key) {
+  return key.replace(/^\w+:/, '');
+}
+
+// The cards due now among the grade's games: Review's count on the home
+// screen.
+export function dueKeys(gradeId, memory, now = Date.now()) {
+  const prefixes = new Set(gradeModes(gradeInfo(gradeId).id).map((m) => KEY_PREFIX[m]));
+  return Object.entries(memory || {})
+    .filter(([key, card]) => prefixes.has(key.split(':')[0]) && isDue(normalize(card), now))
+    .map(([key]) => key);
+}
+
+// When the next card in the grade's games comes due (null if none are
+// waiting).
+export function nextDue(gradeId, memory) {
+  const prefixes = new Set(gradeModes(gradeInfo(gradeId).id).map((m) => KEY_PREFIX[m]));
+  const dues = Object.entries(memory || {})
+    .filter(([key, card]) => prefixes.has(key.split(':')[0]) && normalize(card).state !== 'new')
+    .map(([, card]) => normalize(card).due);
+  return dues.length ? Math.min(...dues) : null;
+}
+
+// One round: ten questions from one game; for Random Mix, from all of the
+// grade's games; for Review, only cards that are due, from all of them,
+// most overdue first.
 export function makeRound(mode, gradeId, memory) {
   const g = gradeInfo(gradeId).id;
+  if (mode === 'review') {
+    const all = gradeModes(g).flatMap((m) => MAKERS[m](g, memory, ROUND_LENGTH, { dueOnly: true }));
+    const seen = new Set();
+    const due = (q) => normalize(memory?.[q.key]).due;
+    return shuffle(all)
+      .filter((q) => (seen.has(wordOf(q.key)) ? false : seen.add(wordOf(q.key))))
+      .sort((a, b) => due(a) - due(b))
+      .slice(0, ROUND_LENGTH);
+  }
   if (mode !== 'mix') return MAKERS[mode](g, memory, ROUND_LENGTH);
   const modes = gradeModes(g);
   const counts = {};
@@ -488,10 +545,16 @@ export function makeRound(mode, gradeId, memory) {
   // after dropping repeats (the same word asked two ways).
   const qs = Object.entries(counts).flatMap(([m, c]) => MAKERS[m](g, memory, c + 2).map((q, i) => ({ q, spare: i >= c })));
   const seen = new Set();
-  const keep = (list) => list.filter(({ q }) => (seen.has(q.key.replace(/^\w+:/, '')) ? false : seen.add(q.key.replace(/^\w+:/, ''))));
+  const keep = (list) => list.filter(({ q }) => (seen.has(wordOf(q.key)) ? false : seen.add(wordOf(q.key))));
   const main = keep(shuffle(qs.filter((x) => !x.spare)));
   const spares = keep(shuffle(qs.filter((x) => x.spare)));
   return shuffle([...main, ...spares].slice(0, ROUND_LENGTH).map((x) => x.q));
+}
+
+// A missed question, asked again a few questions later in the same round
+// (Anki's "Again"): same word, choices in a new order.
+export function againQuestion(q) {
+  return { ...q, choices: shuffle(q.choices), retry: true };
 }
 
 export const MODE_IDS = Object.keys(MAKERS);

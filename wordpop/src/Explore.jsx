@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { SOUNDS, soundLabel } from './content/phonics.js';
 import { PICTURE_VOCAB, VOCAB } from './content/vocab.js';
 import { gradeInfo } from './grades.js';
-import { isLearned } from './store.js';
+import { cardStatus, dueLabel } from './srs.js';
 import { playPop, speak } from './sound.js';
 
 // Explore Letters: every sound, in the order the book teaches them. Tap
@@ -44,23 +44,29 @@ export function ExploreLetters() {
   );
 }
 
+const STATUS_LABEL = { new: 'New', learning: 'Learning', learned: '★ Learned', mastered: '★★ Mastered' };
+
 // The Word Bank: the grade's vocabulary words with what they mean, a
-// sentence, and a star once the player has learned them.
+// sentence, and where each one is in its spaced repetition: new,
+// learning, learned, or mastered (comes back three weeks or more apart).
 export function WordBank({ profile }) {
   const g = gradeInfo(profile.grade).id;
   const level = { p: 0, k: 0, 1: 1, 2: 2, 3: 3, 4: 4 }[g];
   const [open, setOpen] = useState(null);
   const words = level ? VOCAB[level] : PICTURE_VOCAB.map((v) => ({ ...v, s: null }));
-  const learned = words.filter((v) => isLearned(profile.progress, `word:${v.w}`) || isLearned(profile.progress, `big:${v.w}`)).length;
+  const cardFor = (v) => profile.progress.items[`word:${v.w}`] || profile.progress.items[`big:${v.w}`];
+  const statusOf = (v) => cardStatus(cardFor(v));
+  const learned = words.filter((v) => ['learned', 'mastered'].includes(statusOf(v))).length;
+  const mastered = words.filter((v) => statusOf(v) === 'mastered').length;
   return (
     <div className="explore">
       <h2 className="explore-title">Word Bank</h2>
       <p className="explore-sub">
-        {gradeInfo(g).label} words · <strong>{learned}</strong> of {words.length} learned ★
+        {gradeInfo(g).label} words · <strong>{learned}</strong> of {words.length} learned · <strong>{mastered}</strong> mastered
       </p>
       <div className="bank-list">
         {words.map((v) => {
-          const star = isLearned(profile.progress, `word:${v.w}`) || isLearned(profile.progress, `big:${v.w}`);
+          const status = statusOf(v);
           const isOpen = open === v.w;
           return (
             <button
@@ -75,9 +81,10 @@ export function WordBank({ profile }) {
               <span className="bank-word">
                 {v.pic && <span className="bank-pic">{v.pic}</span>}
                 {v.w}
-                <span className={`bank-star${star ? ' bank-star-on' : ''}`}>★</span>
+                <span className={`bank-status bank-status-${status}`}>{STATUS_LABEL[status]}</span>
               </span>
               <span className="bank-def">{v.def}</span>
+              {isOpen && status !== 'new' && <span className="bank-due">Next review: {dueLabel(cardFor(v))}</span>}
               {isOpen && v.s && <span className="bank-sentence">“{v.s.replace('___', v.w)}”</span>}
               {isOpen && v.syn && (
                 <span className="bank-extra">

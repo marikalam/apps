@@ -30,6 +30,8 @@ export const MODES = {
   blank: { title: 'Fill the Blank', sub: 'Finish the sentence', icon: '✏️', from: '#2fae6b', to: '#1e8a52' },
   same: { title: 'Same Meaning', sub: 'Find the synonym', icon: '🤝', from: '#14b8a6', to: '#0e8f82' },
   opposite: { title: 'Opposites', sub: 'Find the antonym', icon: '🔄', from: '#ec5f9a', to: '#cf3f7c' },
+  mix: { title: 'Random Mix', sub: 'A bit of everything', icon: '🎲', from: '#f0954f', to: '#ec5f9a' },
+  review: { title: 'Review', sub: 'Words due today', icon: '🔁', from: '#3b6fef', to: '#8e4fd6' },
   spell: { title: 'Spell It', sub: 'Which spelling is right?', icon: '🐝', from: '#8e4fd6', to: '#6d33b5' },
 };
 

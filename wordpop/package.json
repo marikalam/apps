@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node scripts/check-content.mjs",
+    "check": "node scripts/check-content.mjs && node scripts/check-srs.mjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist -r https://github.com/marikalam/apps.git -b gh-pages -e wordpop --add"
   },

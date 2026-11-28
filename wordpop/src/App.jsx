@@ -6,6 +6,8 @@ import ProfileSwitcher from './ProfileSwitcher.jsx';
 import Quiz from './Quiz.jsx';
 import { GRADES, MODES, exploreFor, gradeInfo, gradeModes } from './grades.js';
 import { SOUNDS, soundLabel } from './content/phonics.js';
+import { dueKeys, nextDue } from './questions.js';
+import { dueLabel } from './srs.js';
 import { PICTURE_VOCAB, VOCAB } from './content/vocab.js';
 import {
   deleteCloudProfile,
@@ -109,6 +111,38 @@ function GradePill({ grade, onChange }) {
   );
 }
 
+// Anki's "due today": the words this player is due to review. Spaced
+// repetition brings each word back just before it would be forgotten.
+function ReviewCard({ profile, onPlay }) {
+  const items = profile.progress.items;
+  const due = dueKeys(profile.grade, items).length;
+  const next = nextDue(profile.grade, items);
+  if (next === null) return null;
+  if (!due) {
+    return (
+      <div className="review-card review-card-done">
+        <span className="review-icon">✅</span>
+        <span className="review-text">
+          <span className="review-title">All caught up!</span>
+          <span className="review-sub">Next review {dueLabel({ state: 'review', due: next })}</span>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <button className="review-card" onClick={() => onPlay('review')}>
+      <span className="review-icon">🔁</span>
+      <span className="review-text">
+        <span className="review-title">Review time</span>
+        <span className="review-sub">
+          {due} {due === 1 ? 'word is' : 'words are'} ready to practice again
+        </span>
+      </span>
+      <span className="review-count">{due}</span>
+    </button>
+  );
+}
+
 function Home({ profile, onPlay, onExplore, onOpenPlayers }) {
   const [bounce, setBounce] = useState(0);
   const g = gradeInfo(profile.grade);
@@ -150,6 +184,8 @@ function Home({ profile, onPlay, onExplore, onOpenPlayers }) {
           <span aria-hidden="true">→</span>
         </button>
       </div>
+
+      <ReviewCard profile={profile} onPlay={onPlay} />
 
       <div className="home-games-head">
         <p className="home-label">Games</p>

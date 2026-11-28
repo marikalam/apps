@@ -1741,3 +1741,88 @@ button {
     transform: scale(1.3);
   }
 }
+/* ---------- spaced repetition */
+.review-card {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 22px;
+  padding: 14px 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #3b6fef, #8e4fd6);
+  box-shadow: var(--shadow);
+}
+.review-card-done {
+  cursor: default;
+  color: var(--ink);
+  background: #e8f8ef;
+  box-shadow: var(--shadow-sm);
+}
+.review-icon {
+  font-size: 30px;
+}
+.review-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.review-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+}
+.review-sub {
+  font-weight: 600;
+  font-size: 14px;
+  opacity: 0.92;
+}
+.review-count {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  background: #fff;
+  color: var(--accent-blue);
+  border-radius: 999px;
+  min-width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
+}
+.again-badge {
+  margin-left: 8px;
+  background: #ffe58a;
+  color: #8a5a00;
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
+.feedback-again {
+  margin: -4px 0 0;
+  font-weight: 600;
+  color: #8a5a00;
+}
+.bank-status {
+  margin-left: auto;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #eef0f6;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.bank-status-learning { background: #fff2c2; color: #8a5a00; }
+.bank-status-learned { background: #e8f8ef; color: #1e8a52; }
+.bank-status-mastered { background: #efe4fb; color: #6d33b5; }
+.bank-due {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-blue);
+}

@@ -1,4 +1,5 @@
 import { DEFAULT_GRADE } from './grades.js';
+import { cardStatus, newerCard, schedule } from './srs.js';
 
 // Players and their progress, kept on this device (and, when signed in,
 // in the family account too - see cloud.js).
@@ -48,18 +49,21 @@ export function saveCurrent(id) {
   }
 }
 
-// One answer: counts it for the game and for the word or sound asked
-// about (so missed ones come back more often).
-export function recordAnswer(progress, q, correct) {
+// One answer: counts it for the game, and reschedules the card for the
+// word or sound asked about (spaced repetition, srs.js). A retry (a
+// missed word asked again in the same round) only reschedules: the round's
+// score and the game's numbers count first tries.
+export function recordAnswer(progress, q, correct, now = Date.now()) {
   const p = { ...emptyProgress(), ...progress };
+  const card = schedule(p.items[q.key], correct, { now, retry: !!q.retry });
+  if (q.retry) return { ...p, items: { ...p.items, [q.key]: card } };
   const mode = p.modes[q.mode] || { answered: 0, correct: 0 };
-  const item = p.items[q.key] || { right: 0, wrong: 0 };
   return {
     ...p,
     answered: p.answered + 1,
     correct: p.correct + (correct ? 1 : 0),
     modes: { ...p.modes, [q.mode]: { answered: mode.answered + 1, correct: mode.correct + (correct ? 1 : 0) } },
-    items: { ...p.items, [q.key]: correct ? { ...item, right: item.right + 1 } : { ...item, wrong: item.wrong + 1 } },
+    items: { ...p.items, [q.key]: card },
   };
 }
 
@@ -68,11 +72,11 @@ export function recordRound(progress, mode, score) {
   return { ...p, rounds: p.rounds + 1, stars: p.stars + score, best: { ...p.best, [mode]: Math.max(p.best[mode] || 0, score) } };
 }
 
-// A word is "learned" once it's been right at least twice, and more
-// often right than wrong.
+// A word is "learned" once it has graduated from learning to review (it
+// was right twice, the second time after its learning step), as in Anki.
 export function isLearned(progress, key) {
-  const m = progress?.items?.[key];
-  return !!m && m.right >= 2 && m.right > m.wrong;
+  const status = cardStatus(progress?.items?.[key]);
+  return status === 'learned' || status === 'mastered';
 }
 
 export function learnedCount(progress) {
@@ -98,7 +102,7 @@ export function mergeProgress(a = {}, b = {}) {
     answered: Math.max(x.answered, y.answered),
     correct: Math.max(x.correct, y.correct),
     modes: maxObj(x.modes, y.modes, ['answered', 'correct']),
-    items: maxObj(x.items, y.items, ['right', 'wrong']),
+    items: Object.fromEntries([...new Set([...Object.keys(x.items), ...Object.keys(y.items)])].map((k) => [k, newerCard(x.items[k], y.items[k])])),
     best,
   };
 }

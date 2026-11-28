@@ -53,7 +53,25 @@ The book's text and lessons aren't reproduced here, only the method.
 - 3rd: benevolent, diligent, frugal, meticulous, resilient…
 - 4th: ambiguous, audacious, conspicuous, ephemeral, ubiquitous…
 
-Each grade also reviews a few words from the year before. Words a child misses come back more often, and a word counts as *learned* (a star in the Word Bank) once it's been right twice and more often right than wrong. The lists are in `src/content/vocab.js`, and the sight words (Dolch lists) are in `src/content/phonics.js`.
+The lists are in `src/content/vocab.js`, and the sight words (Dolch lists) are in `src/content/phonics.js`.
+
+## Spaced repetition (like Anki)
+
+Every word and sound is a flashcard for each player, scheduled with Anki's SM-2 method (`src/srs.js`):
+
+- **New → learning**: a word you just met (or missed) comes back after about 10 minutes. Get it right again and it *graduates*: next review tomorrow.
+- **Reviews spread out**: each time it's right when due, the gap grows by the card's ease (2.5 to start): 1 day → 3 → 8 → 20 → 50 days. Known words show up less and less; shaky ones keep coming.
+- **Lapses**: missing a learned word lowers its ease (it'll come back more often from now on), halves its gap, and sends it back to short relearning steps.
+- **"Again" within a round**: a missed word is asked again three questions later, with the choices reshuffled. The round's score counts first tries only.
+- **Rounds are built like an Anki session**: due words first (most overdue first), then up to 4 new words while reviews are waiting, then practice-ahead.
+- **Review card on the home screen**: "Review time · 10 words are ready to practice again", or "All caught up! Next review tomorrow". Review rounds ask only due words, across all the grade's games.
+- **Word Bank** shows each word as New, Learning, ★ Learned or ★★ Mastered (21+ days apart, Anki's "mature"), with its next review.
+- Words already started from the grade before stay in the rotation, so moving up a grade doesn't drop their reviews.
+- Cards sync with the family account; if the same player practiced on two devices, the most recently answered copy of each card wins.
+
+A multiple-choice answer can't say "hard" or "easy" the way Anki's buttons do, so right counts as Anki's *Good* and wrong as *Again*.
+
+## Checking the questions
 
 Wrong answers are picked so they can't also be right: words that mean the same thing, or are each other's opposites, never appear together as choices. `npm run check` plays thousands of rounds for every grade and checks every question.
 
@@ -62,7 +80,7 @@ Wrong answers are picked so they can't also be right: words that mean the same t
 ```
 npm install
 npm run dev        # http://localhost:5173/apps/wordpop/
-npm run check      # checks every game's questions
+npm run check      # checks every game's questions and the spaced-repetition scheduler
 npm run deploy     # builds and publishes to the apps site's gh-pages, under /wordpop
 ```
 

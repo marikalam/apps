@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Buzzy, Confetti, CountUp } from './bits.jsx';
 import { MODES } from './grades.js';
 import { partSay } from './content/phonics.js';
-import { ROUND_LENGTH, makeRound } from './questions.js';
+import { ROUND_LENGTH, againQuestion, makeRound } from './questions.js';
 import { feedback, playFanfare, playPop, speak, stopSpeaking } from './sound.js';
 
 const PRAISE = ['Great job', 'You got it', 'Awesome', 'Super reading', 'Way to go', 'Brilliant'];
@@ -130,7 +130,7 @@ function Results({ score, total, mode, name, onAgain, onHome }) {
       <p className="results-score">
         <CountUp to={score} /> <span>/ {total} right</span>
       </p>
-      <p className="results-sub">+{score} ★ for {mode === 'mix' ? 'Random Mix' : MODES[mode].title}</p>
+      <p className="results-sub">+{score} ★ for {MODES[mode].title}</p>
       <div className="results-actions">
         <button className="pill-btn-primary pill-btn-full" onClick={onAgain}>
           Play again
@@ -146,10 +146,10 @@ function Results({ score, total, mode, name, onAgain, onHome }) {
 // One round of ten questions.
 export default function Quiz({ mode, profile, onAnswer, onRoundDone, onHome }) {
   const [roundId, setRoundId] = useState(0);
-  // Questions are made once per round (missed words from earlier rounds
-  // are more likely to be picked).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const questions = useMemo(() => makeRound(mode, profile.grade, profile.progress.items), [mode, profile.grade, roundId]);
+  // Questions are made once per round, from the player's spaced-repetition
+  // cards: due words first, then a few new ones. A missed word is added
+  // again a few questions later (Anki's "Again"), so the list can grow.
+  const [questions, setQuestions] = useState(() => makeRound(mode, profile.grade, profile.progress.items));
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState(null);
   const [results, setResults] = useState([]);
@@ -158,7 +158,10 @@ export default function Quiz({ mode, profile, onAnswer, onRoundDone, onHome }) {
 
   const q = questions[index];
   const total = questions.length;
-  const color = mode === 'mix' ? MODES[q?.mode] || MODES.meaning : MODES[mode];
+  const color = MODES[q?.mode] || MODES[mode] || MODES.meaning;
+  const firstTries = (list) => list.filter((x, i) => !questions[i]?.retry);
+  const score = firstTries(results).filter(Boolean).length;
+  const asked = questions.filter((x) => !x.retry).length;
 
   useEffect(() => {
     if (!q || done) return undefined;
@@ -187,13 +190,19 @@ export default function Quiz({ mode, profile, onAnswer, onRoundDone, onHome }) {
     });
     feedback(correct);
     onAnswer(q, correct);
+    // Missed: it comes back in three questions (once per round).
+    if (!correct && !q.retry) {
+      setQuestions((list) => {
+        const at = Math.min(index + 3, list.length);
+        return [...list.slice(0, at), againQuestion(q), ...list.slice(at)];
+      });
+    }
     const lead = correct ? `${PRAISE[Math.floor(Math.random() * PRAISE.length)]}${Math.random() < 0.5 ? `, ${profile.name}` : ''}!` : 'Not quite.';
     setTimeout(() => speak(`${lead} ${q.after.speak}`), 450);
   }
 
   function next() {
     if (index + 1 >= total) {
-      const score = results.filter(Boolean).length;
       onRoundDone(mode, score);
       setDone(true);
       return;
@@ -204,6 +213,7 @@ export default function Quiz({ mode, profile, onAnswer, onRoundDone, onHome }) {
 
   function again() {
     setRoundId((n) => n + 1);
+    setQuestions(makeRound(mode, profile.grade, profile.progress.items));
     setIndex(0);
     setPicked(null);
     setResults([]);
@@ -211,18 +221,34 @@ export default function Quiz({ mode, profile, onAnswer, onRoundDone, onHome }) {
   }
 
   if (done) {
-    return <Results score={results.filter(Boolean).length} total={total} mode={mode} name={profile.name} onAgain={again} onHome={onHome} />;
+    return <Results score={score} total={asked} mode={mode} name={profile.name} onAgain={again} onHome={onHome} />;
   }
-  if (!q) return null;
+  if (!q) {
+    return (
+      <div className="results">
+        <Buzzy size={110} />
+        <h2 className="results-title">All caught up!</h2>
+        <p className="results-sub">No words are due for review right now. Play a game to learn new ones.</p>
+        <div className="results-actions">
+          <button className="pill-btn-primary pill-btn-full" onClick={onHome}>
+            Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const correct = picked === q.answer;
-  const title = mode === 'mix' ? MODES[q.mode].title : MODES[mode].title;
+  const title = MODES[q.mode].title;
 
   return (
     <div className="quiz">
       <Progress index={index} results={results} total={total || ROUND_LENGTH} />
       <div className="question-title-row">
-        <span className="question-game">{title}</span>
+        <span className="question-game">
+          {mode === 'review' ? `Review · ${title}` : title}
+          {q.retry && <span className="again-badge">Again!</span>}
+        </span>
         <h2 className="question-title">{q.title}</h2>
       </div>
       <PromptCard key={`${roundId}-${index}`} q={q} color={color} />
@@ -241,6 +267,7 @@ export default function Quiz({ mode, profile, onAnswer, onRoundDone, onHome }) {
         <div ref={nextRef} className={`feedback ${correct ? 'feedback-right' : 'feedback-wrong'}`}>
           {correct && <Confetti pieces={18} />}
           <p className="feedback-head">{correct ? '🎉 Yes!' : '💛 Not quite'}</p>
+          {!correct && !q.retry && <p className="feedback-again">We’ll try this one again in a moment.</p>}
           <button className="feedback-text" onClick={() => speak(q.after.speak)}>
             {q.after.text} <span aria-hidden="true">🔊</span>
           </button>
